@@ -1,0 +1,43 @@
+name: Import SEEN
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Unpack the bundle
+        run: git fetch .github/workflows/seenfororiginmain.bundle seen-main:seen-import
+
+      - name: Merge the application into main
+        run: |
+          git merge seen-import --no-edit || true
+          if [ -n "$(git ls-files -u)" ]; then
+            git checkout --theirs .github/workflows/blank.yml
+            git add .github/workflows/blank.yml
+          fi
+          if git ls-files --error-unmatch .github/workflows/seenfororiginmain.bundle >/dev/null 2>&1; then
+            git rm -q --cached .github/workflows/seenfororiginmain.bundle
+            rm -f .github/workflows/seenfororiginmain.bundle
+          fi
+          if [ -f .git/MERGE_HEAD ] || ! git diff --cached --quiet; then
+            git commit -m "Import the SEEN application from the bundle"
+          else
+            echo "Nothing to import - main is already up to date."
+          fi
+
+      - name: Push
+        run: git push origin HEAD:main
